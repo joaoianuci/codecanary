@@ -88,7 +88,14 @@ func FetchLocalDiff(baseBranch string) (*PRData, error) {
 func RunLocal(opts RunLocalOptions) error {
 	baseBranch := opts.BaseBranch
 	if baseBranch == "" {
-		baseBranch = "main"
+		// Prefer origin/main over local main to ensure the merge base
+		// matches what GitHub uses for the PR diff, regardless of whether
+		// the local main branch is up-to-date.
+		if _, err := exec.Command("git", "rev-parse", "--verify", "origin/main").Output(); err == nil {
+			baseBranch = "origin/main"
+		} else {
+			baseBranch = "main"
+		}
 	}
 
 	// 1. Fetch local diff.

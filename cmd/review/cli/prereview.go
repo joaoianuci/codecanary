@@ -25,7 +25,7 @@ var preReviewCmd = &cobra.Command{
 }
 
 func init() {
-	preReviewCmd.Flags().StringP("base", "b", "main", "Base branch to diff against")
+	preReviewCmd.Flags().StringP("base", "b", "", "Base branch to diff against (default: origin/main if available, otherwise main)")
 	preReviewCmd.Flags().StringP("output", "o", "markdown", "Output format: markdown or json")
 	preReviewCmd.Flags().StringP("config", "c", ".codecanary.yml", "Path to review config")
 	preReviewCmd.Flags().Bool("dry-run", false, "Show prompt without running Claude")
