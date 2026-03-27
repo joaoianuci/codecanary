@@ -132,45 +132,24 @@ func RunLocal(opts RunLocalOptions) error {
 		fmt.Fprintf(os.Stderr, "Loaded %d project doc(s) for review context\n", len(projectDocs))
 	}
 
-	// 4. Filter diff and file list to non-ignored files.
-	// Unlike the PR review flow (which only ignores file contents), the local diff
-	// may include many files irrelevant to code review (e.g. .github/workflows/).
-	// Scoping the diff here reduces prompt size significantly.
-	if len(cfg.Ignore) > 0 {
-		allowed := make(map[string]bool, len(pr.Files))
-		var filteredFiles []string
-		for _, f := range pr.Files {
-			if !matchesIgnore(f, cfg.Ignore) {
-				allowed[f] = true
-				filteredFiles = append(filteredFiles, f)
-			}
-		}
-		ignoredCount := len(pr.Files) - len(filteredFiles)
-		if ignoredCount > 0 {
-			fmt.Fprintf(os.Stderr, "Excluded %d ignored file(s) from diff\n", ignoredCount)
-		}
-		pr.Diff = ScopeDiffToFiles(pr.Diff, allowed)
-		pr.Files = filteredFiles
-	}
-
-	// 5. Fetch full file contents for changed files.
+	// 4. Fetch full file contents for changed files.
 	fileContents, skippedFiles := FetchFileContents(pr.Files, cfg.Ignore, cfg.EffectiveMaxFileSize(), cfg.EffectiveMaxTotalSize())
 	pr.FileContents = fileContents
 	if len(skippedFiles) > 0 {
 		fmt.Fprintf(os.Stderr, "Skipped %d large/ignored files: %s\n", len(skippedFiles), strings.Join(skippedFiles, ", "))
 	}
 
-	// 6. Build prompt.
+	// 5. Build prompt.
 	fmt.Fprintf(os.Stderr, "Reviewing local changes against %q...\n", baseBranch)
 	prompt := BuildPrompt(pr, cfg, 0, projectDocs)
 
-	// 7. Dry run — print prompt and return.
+	// 6. Dry run — print prompt and return.
 	if opts.DryRun {
 		fmt.Print(prompt)
 		return nil
 	}
 
-	// 8. Run Claude.
+	// 7. Run Claude.
 	env := resolveEnv()
 	tracker := &UsageTracker{}
 
@@ -182,7 +161,7 @@ func RunLocal(opts RunLocalOptions) error {
 	usage.Phase = "review"
 	tracker.Add(usage)
 
-	// 9. Parse findings.
+	// 8. Parse findings.
 	findings, err := ParseFindings(claudeOut.Text)
 	if err != nil {
 		return fmt.Errorf("parsing findings: %w", err)
