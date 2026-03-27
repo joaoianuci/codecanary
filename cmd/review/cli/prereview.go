@@ -1,0 +1,33 @@
+package cli
+
+import (
+	"github.com/alansikora/codecanary/internal/review"
+	"github.com/spf13/cobra"
+)
+
+var preReviewCmd = &cobra.Command{
+	Use:   "pre-review",
+	Short: "Review local changes before opening a PR",
+	Long:  "Review your local branch changes without a GitHub PR. Diffs the current branch against a base branch and runs CodeCanary locally — no CI triggered.",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		baseBranch, _ := cmd.Flags().GetString("base")
+		output, _ := cmd.Flags().GetString("output")
+		configPath, _ := cmd.Flags().GetString("config")
+		dryRun, _ := cmd.Flags().GetBool("dry-run")
+
+		return review.RunLocal(review.RunLocalOptions{
+			BaseBranch: baseBranch,
+			ConfigPath: configPath,
+			Output:     output,
+			DryRun:     dryRun,
+		})
+	},
+}
+
+func init() {
+	preReviewCmd.Flags().StringP("base", "b", "main", "Base branch to diff against")
+	preReviewCmd.Flags().StringP("output", "o", "markdown", "Output format: markdown or json")
+	preReviewCmd.Flags().StringP("config", "c", ".codecanary.yml", "Path to review config")
+	preReviewCmd.Flags().Bool("dry-run", false, "Show prompt without running Claude")
+	rootCmd.AddCommand(preReviewCmd)
+}
