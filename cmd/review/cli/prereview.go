@@ -15,17 +15,15 @@ var preReviewCmd = &cobra.Command{
 		configPath, _ := cmd.Flags().GetString("config")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
 		saveUsage, _ := cmd.Flags().GetBool("save-usage")
-		fixPromptOnly, _ := cmd.Flags().GetBool("fix-prompt")
-		noFixPrompt, _ := cmd.Flags().GetBool("no-fix-prompt")
+		applyFixes, _ := cmd.Flags().GetBool("fix")
 
 		return review.RunLocal(review.RunLocalOptions{
-			BaseBranch:    baseBranch,
-			ConfigPath:    configPath,
-			Output:        output,
-			DryRun:        dryRun,
-			SaveUsage:     saveUsage,
-			FixPromptOnly: fixPromptOnly,
-			NoFixPrompt:   noFixPrompt,
+			BaseBranch: baseBranch,
+			ConfigPath: configPath,
+			Output:     output,
+			DryRun:     dryRun,
+			SaveUsage:  saveUsage,
+			ApplyFixes: applyFixes,
 		})
 	},
 }
@@ -36,7 +34,6 @@ func init() {
 	preReviewCmd.Flags().StringP("config", "c", ".codecanary.yml", "Path to review config")
 	preReviewCmd.Flags().Bool("dry-run", false, "Show prompt without running Claude")
 	preReviewCmd.Flags().Bool("save-usage", false, "Write codecanary-usage.json with token usage report")
-	preReviewCmd.Flags().Bool("fix-prompt", false, "Output only the fix-all prompt, no review markdown (useful for piping: --fix-prompt | claude)")
-	preReviewCmd.Flags().Bool("no-fix-prompt", false, "Suppress the fix-all prompt appended after the review")
+	preReviewCmd.Flags().Bool("fix", false, "Automatically apply all findings via Claude after the review")
 	rootCmd.AddCommand(preReviewCmd)
 }

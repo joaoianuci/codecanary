@@ -10,13 +10,12 @@ import (
 
 // RunLocalOptions configures a local (pre-PR) review run.
 type RunLocalOptions struct {
-	BaseBranch    string // branch to diff against (default: "origin/main" or "main")
-	ConfigPath    string
-	Output        string // "markdown" or "json"
-	DryRun        bool
-	SaveUsage     bool // write codecanary-usage.json (default: false)
-	FixPromptOnly bool // output only the fix-all prompt, no review markdown (for piping)
-	NoFixPrompt   bool // suppress the fix-all prompt appended after the review
+	BaseBranch string // branch to diff against (default: "origin/main" or "main")
+	ConfigPath string
+	Output     string // "markdown" or "json"
+	DryRun     bool
+	SaveUsage  bool // write codecanary-usage.json (default: false)
+	ApplyFixes bool // run claude automatically to apply all findings after review
 }
 
 // FetchLocalDiff builds a PRData struct from the local git diff against baseBranch.
@@ -191,16 +190,6 @@ func RunLocal(opts RunLocalOptions) error {
 		fmt.Fprintf(os.Stderr, "Found %d finding(s)\n", len(findings))
 	}
 
-	// 8b. Fix-prompt-only mode: output the fix-all prompt and return.
-	if opts.FixPromptOnly {
-		if len(findings) == 0 {
-			fmt.Fprintf(os.Stderr, "No findings to fix\n")
-			return nil
-		}
-		fmt.Print(buildFixAllPrompt(findings))
-		return nil
-	}
-
 	// 9. Get HEAD SHA for result tracking.
 	headSHA, _ := exec.Command("git", "rev-parse", "HEAD").Output()
 
@@ -233,13 +222,14 @@ func RunLocal(opts RunLocalOptions) error {
 		if idx := strings.Index(md, "\n<!-- codecanary:review "); idx != -1 {
 			md = md[:idx]
 		}
-		// Append the fix-all prompt unless suppressed or there are no findings.
-		if !opts.NoFixPrompt && len(findings) > 0 {
+		// Append the fix-all prompt when there are findings.
+		if len(findings) > 0 {
 			md += "\n---\n\n## Fix All With AI\n\n"
-			md += "Paste the prompt below into your AI coding tool, or run: `codecanary pre-review --fix-prompt | claude`\n\n"
-			fence := codeFence(buildFixAllPrompt(findings))
+			md += "Paste the prompt below into your AI coding tool, or run: `codecanary pre-review --fix`\n\n"
+			fixPrompt := buildFixAllPrompt(findings)
+			fence := codeFence(fixPrompt)
 			md += fence + "\n"
-			md += buildFixAllPrompt(findings)
+			md += fixPrompt
 			md += fence + "\n"
 		}
 		formatted = md
@@ -247,7 +237,19 @@ func RunLocal(opts RunLocalOptions) error {
 
 	fmt.Print(formatted)
 
-	// 11. Write usage report only when explicitly requested.
+	// 11. Apply fixes via Claude if requested.
+	if opts.ApplyFixes && len(findings) > 0 {
+		fmt.Fprintf(os.Stderr, "\nApplying fixes via Claude...\n\n")
+		claudeCmd := exec.Command("claude", "--print")
+		claudeCmd.Stdin = strings.NewReader(buildFixAllPrompt(findings))
+		claudeCmd.Stdout = os.Stdout
+		claudeCmd.Stderr = os.Stderr
+		if err := claudeCmd.Run(); err != nil {
+			return fmt.Errorf("applying fixes: %w", err)
+		}
+	}
+
+	// 12. Write usage report only when explicitly requested.
 	if opts.SaveUsage {
 		if report := tracker.Report("local", 0); len(report.Calls) > 0 {
 			if err := WriteUsageFile(report); err != nil {
