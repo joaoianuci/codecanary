@@ -10,10 +10,11 @@ import (
 
 // RunLocalOptions configures a local (pre-PR) review run.
 type RunLocalOptions struct {
-	BaseBranch string // branch to diff against (default: "main")
+	BaseBranch string // branch to diff against (default: "origin/main" or "main")
 	ConfigPath string
 	Output     string // "markdown" or "json"
 	DryRun     bool
+	SaveUsage  bool // write codecanary-usage.json (default: false)
 }
 
 // FetchLocalDiff builds a PRData struct from the local git diff against baseBranch.
@@ -213,15 +214,24 @@ func RunLocal(opts RunLocalOptions) error {
 		}
 		formatted = jsonOut
 	default:
-		formatted = FormatMarkdown(reviewResult)
+		// Strip the hidden <!-- codecanary:review {...} --> block that FormatMarkdown
+		// appends for incremental PR reviews. It serves no purpose in pre-review output
+		// and pollutes the terminal.
+		md := FormatMarkdown(reviewResult)
+		if idx := strings.Index(md, "\n<!-- codecanary:review "); idx != -1 {
+			md = md[:idx]
+		}
+		formatted = md
 	}
 
 	fmt.Print(formatted)
 
-	// 11. Write usage report.
-	if report := tracker.Report("local", 0); len(report.Calls) > 0 {
-		if err := WriteUsageFile(report); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: could not write usage report: %v\n", err)
+	// 11. Write usage report only when explicitly requested.
+	if opts.SaveUsage {
+		if report := tracker.Report("local", 0); len(report.Calls) > 0 {
+			if err := WriteUsageFile(report); err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: could not write usage report: %v\n", err)
+			}
 		}
 	}
 

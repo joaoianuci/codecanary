@@ -14,12 +14,14 @@ var preReviewCmd = &cobra.Command{
 		output, _ := cmd.Flags().GetString("output")
 		configPath, _ := cmd.Flags().GetString("config")
 		dryRun, _ := cmd.Flags().GetBool("dry-run")
+		saveUsage, _ := cmd.Flags().GetBool("save-usage")
 
 		return review.RunLocal(review.RunLocalOptions{
 			BaseBranch: baseBranch,
 			ConfigPath: configPath,
 			Output:     output,
 			DryRun:     dryRun,
+			SaveUsage:  saveUsage,
 		})
 	},
 }
@@ -29,5 +31,6 @@ func init() {
 	preReviewCmd.Flags().StringP("output", "o", "markdown", "Output format: markdown or json")
 	preReviewCmd.Flags().StringP("config", "c", ".codecanary.yml", "Path to review config")
 	preReviewCmd.Flags().Bool("dry-run", false, "Show prompt without running Claude")
+	preReviewCmd.Flags().Bool("save-usage", false, "Write codecanary-usage.json with token usage report")
 	rootCmd.AddCommand(preReviewCmd)
 }
