@@ -10,11 +10,13 @@ import (
 
 // RunLocalOptions configures a local (pre-PR) review run.
 type RunLocalOptions struct {
-	BaseBranch string // branch to diff against (default: "origin/main" or "main")
-	ConfigPath string
-	Output     string // "markdown" or "json"
-	DryRun     bool
-	SaveUsage  bool // write codecanary-usage.json (default: false)
+	BaseBranch    string // branch to diff against (default: "origin/main" or "main")
+	ConfigPath    string
+	Output        string // "markdown" or "json"
+	DryRun        bool
+	SaveUsage     bool // write codecanary-usage.json (default: false)
+	FixPromptOnly bool // output only the fix-all prompt, no review markdown (for piping)
+	NoFixPrompt   bool // suppress the fix-all prompt appended after the review
 }
 
 // FetchLocalDiff builds a PRData struct from the local git diff against baseBranch.
@@ -189,6 +191,16 @@ func RunLocal(opts RunLocalOptions) error {
 		fmt.Fprintf(os.Stderr, "Found %d finding(s)\n", len(findings))
 	}
 
+	// 8b. Fix-prompt-only mode: output the fix-all prompt and return.
+	if opts.FixPromptOnly {
+		if len(findings) == 0 {
+			fmt.Fprintf(os.Stderr, "No findings to fix\n")
+			return nil
+		}
+		fmt.Print(buildFixAllPrompt(findings))
+		return nil
+	}
+
 	// 9. Get HEAD SHA for result tracking.
 	headSHA, _ := exec.Command("git", "rev-parse", "HEAD").Output()
 
@@ -220,6 +232,15 @@ func RunLocal(opts RunLocalOptions) error {
 		md := FormatMarkdown(reviewResult)
 		if idx := strings.Index(md, "\n<!-- codecanary:review "); idx != -1 {
 			md = md[:idx]
+		}
+		// Append the fix-all prompt unless suppressed or there are no findings.
+		if !opts.NoFixPrompt && len(findings) > 0 {
+			md += "\n---\n\n## Fix All With AI\n\n"
+			md += "Paste the prompt below into your AI coding tool, or run: `codecanary pre-review --fix-prompt | claude`\n\n"
+			fence := codeFence(buildFixAllPrompt(findings))
+			md += fence + "\n"
+			md += buildFixAllPrompt(findings)
+			md += fence + "\n"
 		}
 		formatted = md
 	}
